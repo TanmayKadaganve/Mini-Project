@@ -69,7 +69,10 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
       !subject ||
       !module
     ) {
+//       console.log("Received fields:", req.body);
+// console.log("Received file:", req.file?.originalname);
       return res.status(400).json({
+
         message: "PDF and all academic fields are required.",
       });
     }
@@ -113,7 +116,7 @@ router.post("/upload", upload.single("pdf"), async (req, res) => {
     uploadedFileId = fileId;
 
     const stream = bucket.openUploadStream(safeName, {
-      _id: fileId,
+      id: fileId,
       contentType: "application/pdf",
       metadata: {
         scheme,
@@ -186,11 +189,30 @@ async function sendPDF(req, res, disposition) {
       });
     }
 
-    const file = await bucket.find({ _id: resource.fileId }).next();
+    // const file = await bucket.find({ _id: resource.fileId }).next();
 
-    if (!file) {
-      return res.status(404).json({ message: "PDF file not found." });
-    }
+    // if (!file) {
+    //   return res.status(404).json({ message: "PDF file not found." });
+    // }
+
+    console.log("Resource ID:", resource._id);
+console.log("Resource fileId:", resource.fileId);
+
+const file = await bucket.find({
+  _id: new mongoose.Types.ObjectId(resource.fileId)
+}).next();
+
+console.log("GridFS file:", file);
+
+if (!file) {
+  return res.status(404).json({
+    message: "PDF file not found."
+  });
+}
+
+
+
+
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("X-Content-Type-Options", "nosniff");

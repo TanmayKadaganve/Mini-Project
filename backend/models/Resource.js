@@ -1,3 +1,5 @@
+// Resource data model
+
 import mongoose from "mongoose";
 
 const resourceSchema = new mongoose.Schema(
