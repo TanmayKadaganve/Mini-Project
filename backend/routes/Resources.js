@@ -1,28 +1,57 @@
+
 import express from "express";
 import multer from "multer";
 import mongoose from "mongoose";
 import { Readable } from "stream";
-import Resource from "../models/Resource.js";
 
+import Resource from "../models/Resource.js";
+import { facultyAuth } from "../middleware/facultyAuth.js";
 
 const router = express.Router();
 
+const allowedBranches = [
+  "FIRST YEAR",
+  "CSE",
+  "AIML",
+  "ECE",
+  "MECHANICAL",
+  "CIVIL",
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+  },
 });
 
 function validObjectId(id) {
   return mongoose.isValidObjectId(id);
 }
 
-// List resources for the exact scheme, branch, semester,
-// subject and module.
-router.get("/", async (req, res) => {
-  try {
-    const { scheme, branch, semester, subject, module } = req.query;
+// ==================================================
+// GET: List resources
+// Public access for students and faculty
+// ==================================================
 
-    if (!scheme || !branch || !semester || !subject || !module) {
+router.get("/", async (req, res) => {
+  
+  try {
+    const {
+      scheme,
+      branch,
+      semester,
+      subject,
+      module,
+    } = req.query;
+const normalizedBranch = branch.trim().toUpperCase();
+    if (
+      !scheme ||
+      !branch ||
+      !semester ||
+      !subject ||
+      !module
+    ) {
       return res.status(400).json({
         message: "All academic filters are required.",
       });
@@ -30,7 +59,7 @@ router.get("/", async (req, res) => {
 
     const resources = await Resource.find({
       scheme,
-      branch,
+      branch: normalizedBranch,
       semester: Number(semester),
       subject,
       module: Number(module),
@@ -39,146 +68,262 @@ router.get("/", async (req, res) => {
       .sort({ uploadedAt: -1 })
       .lean();
 
-    res.json({ resources });
+    return res.json({ resources });
   } catch (error) {
     console.error("List resources error:", error);
-    res.status(500).json({ message: "Could not load resources." });
+
+    return res.status(500).json({
+      message: "Could not load resources.",
+    });
   }
 });
 
-// Upload a PDF to GridFS and save its metadata.
-// Protect this endpoint with faculty authentication before production.
-router.post("/upload", upload.single("pdf"), async (req, res) => {
-  let uploadedFileId;
+// ==================================================
+// POST: Upload PDF
+// Faculty authentication required
+// Branch comes from the verified JWT
+// ==================================================
 
-  try {
-    const {
-      scheme,
-      branch,
-      semester,
-      subject,
-      module,
-      resourceType,
-    } = req.body;
+router.post(
+  "/upload",
+  facultyAuth,
+  upload.single("pdf"),
+  async (req, res) => {
+    let uploadedFileId;
 
-    if (
-      !req.file ||
-      !scheme ||
-      !branch ||
-      !semester ||
-      !subject ||
-      !module
-    ) {
-//       console.log("Received fields:", req.body);
-// console.log("Received file:", req.file?.originalname);
-      return res.status(400).json({
+    try {
+      const {
+        scheme,
+        semester,
+        subject,
+        module,
+        resourceType,
+      } = req.body;
 
-        message: "PDF and all academic fields are required.",
+      // Never trust the branch sent by the frontend.
+      const branch = req.faculty.branch
+        .trim()
+        .toUpperCase();
+
+      if (!allowedBranches.includes(branch)) {
+        return res.status(403).json({
+          message: "Invalid faculty branch.",
+        });
+      }
+
+      if (
+        !req.file ||
+        !scheme ||
+        !semester ||
+        !subject ||
+        !module
+      ) {
+        return res.status(400).json({
+          message: "PDF and all academic fields are required.",
+        });
+      }
+
+      if (!["2022", "2025"].includes(scheme)) {
+        return res.status(400).json({
+          message: "Invalid scheme.",
+        });
+      }
+
+      if (req.file.mimetype !== "application/pdf") {
+        return res.status(400).json({
+          message: "Only PDF files are allowed.",
+        });
+      }
+
+      if (
+        !Number.isInteger(Number(semester)) ||
+        Number(semester) < 1 ||
+        Number(semester) > 8 ||
+        !Number.isInteger(Number(module)) ||
+        Number(module) < 1 ||
+        Number(module) > 5
+      ) {
+        return res.status(400).json({
+          message: "Invalid semester or module.",
+        });
+      }
+
+      if (!subject.trim()) {
+        return res.status(400).json({
+          message: "Subject is required.",
+        });
+      }
+
+      const bucket = req.app.locals.gridFSBucket;
+
+      if (!bucket) {
+        return res.status(503).json({
+          message: "File storage is not ready.",
+        });
+      }
+
+      const safeName = req.file.originalname
+        .replace(/[\\/]/g, "_")
+        .slice(0, 180);
+
+      const fileId = new mongoose.Types.ObjectId();
+
+      uploadedFileId = fileId;
+
+      const stream = bucket.openUploadStream(safeName, {
+        id: fileId,
+        contentType: "application/pdf",
+        metadata: {
+          scheme,
+          branch,
+          semester: Number(semester),
+          subject: subject.trim(),
+          module: Number(module),
+        },
       });
-    }
 
-    if (!["2018", "2025"].includes(scheme)) {
-      return res.status(400).json({ message: "Invalid scheme." });
-    }
+      await new Promise((resolve, reject) => {
+        stream.on("error", reject);
+        stream.on("finish", resolve);
 
-    if (req.file.mimetype !== "application/pdf") {
-      return res.status(400).json({
-        message: "Only PDF files are allowed.",
+        Readable.from(req.file.buffer).pipe(stream);
       });
-    }
 
-    if (
-      !Number.isInteger(Number(semester)) ||
-      Number(semester) < 1 ||
-      Number(semester) > 8 ||
-      !Number.isInteger(Number(module)) ||
-      Number(module) < 1 ||
-      Number(module) > 5
-    ) {
-      return res.status(400).json({
-        message: "Invalid semester or module.",
-      });
-    }
-
-    const bucket = req.app.locals.gridFSBucket;
-
-    if (!bucket) {
-      return res.status(503).json({
-        message: "File storage is not ready.",
-      });
-    }
-
-    const safeName = req.file.originalname
-      .replace(/[\\/]/g, "_")
-      .slice(0, 180);
-
-    const fileId = new mongoose.Types.ObjectId();
-    uploadedFileId = fileId;
-
-    const stream = bucket.openUploadStream(safeName, {
-      id: fileId,
-      contentType: "application/pdf",
-      metadata: {
+      const resource = await Resource.create({
         scheme,
         branch,
         semester: Number(semester),
-        subject,
+        subject: subject.trim(),
         module: Number(module),
-      },
-    });
+        originalName: safeName,
+        resourceType:
+          resourceType?.trim() || "Study Material",
+        fileId,
+        fileSize: req.file.size,
+      });
 
-    await new Promise((resolve, reject) => {
-      stream.on("error", reject);
-      stream.on("finish", resolve);
-      Readable.from(req.file.buffer).pipe(stream);
-    });
-
-    const resource = await Resource.create({
-      scheme,
-      branch: branch.trim(),
-      semester: Number(semester),
-      subject: subject.trim(),
-      module: Number(module),
-      originalName: safeName,
-      resourceType: resourceType || "Study Material",
-      fileId,
-      fileSize: req.file.size,
-    });
-
-    res.status(201).json({
-      message: "PDF uploaded successfully.",
-      resource: {
-        _id: resource._id,
-        originalName: resource.originalName,
-        resourceType: resource.resourceType,
-      },
-    });
-  } catch (error) {
-    // Avoid leaving an orphaned GridFS file if metadata saving fails.
-    if (uploadedFileId && req.app.locals.gridFSBucket) {
-      try {
-        await req.app.locals.gridFSBucket.delete(uploadedFileId);
-      } catch {
-        // The file may not have finished uploading.
+      return res.status(201).json({
+        message: "PDF uploaded successfully.",
+        resource: {
+          _id: resource._id,
+          originalName: resource.originalName,
+          resourceType: resource.resourceType,
+        },
+      });
+    } catch (error) {
+      // Clean up the GridFS file if metadata creation fails.
+      if (
+        uploadedFileId &&
+        req.app.locals.gridFSBucket
+      ) {
+        try {
+          await req.app.locals.gridFSBucket.delete(
+            uploadedFileId
+          );
+        } catch {
+          // File may not have completed uploading.
+        }
       }
+
+      console.error("Upload resource error:", error);
+
+      return res.status(500).json({
+        message: "PDF upload failed.",
+      });
     }
-
-    console.error("Upload resource error:", error);
-    res.status(500).json({ message: "PDF upload failed." });
   }
-});
+);
 
-// Shared handler for inline viewing and downloading.
+// ==================================================
+// DELETE: Delete resource
+// Faculty authentication required
+// Faculty can delete only their own branch resources
+// ==================================================
+
+router.delete(
+  "/:id",
+  facultyAuth,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!validObjectId(id)) {
+        return res.status(400).json({
+          message: "Invalid resource ID.",
+        });
+      }
+
+      const resource = await Resource.findById(id);
+
+      if (!resource) {
+        return res.status(404).json({
+          message: "Resource not found.",
+        });
+      }
+
+      const facultyBranch = req.faculty.branch
+        .trim()
+        .toUpperCase();
+
+      // Prevent cross-branch deletion.
+      if (
+        resource.branch.trim().toUpperCase() !==
+        facultyBranch
+      ) {
+        return res.status(403).json({
+          message:
+            "You cannot delete resources belonging to another branch.",
+        });
+      }
+
+      const bucket = req.app.locals.gridFSBucket;
+
+      if (!bucket) {
+        return res.status(503).json({
+          message: "File storage is not ready.",
+        });
+      }
+
+      // Delete the PDF from GridFS.
+      await bucket.delete(resource.fileId);
+
+      // Delete the resource metadata from MongoDB.
+      await Resource.findByIdAndDelete(id);
+
+      return res.json({
+        message: "Resource deleted successfully.",
+      });
+    } catch (error) {
+      console.error("Delete resource error:", error);
+
+      return res.status(500).json({
+        message: "Could not delete resource.",
+      });
+    }
+  }
+);
+
+// ==================================================
+// Shared handler for viewing and downloading PDFs
+// Public access
+// ==================================================
+
 async function sendPDF(req, res, disposition) {
   try {
     if (!validObjectId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid resource ID." });
+      return res.status(400).json({
+        message: "Invalid resource ID.",
+      });
     }
 
-    const resource = await Resource.findById(req.params.id);
+    const resource = await Resource.findById(
+      req.params.id
+    );
 
     if (!resource) {
-      return res.status(404).json({ message: "Resource not found." });
+      return res.status(404).json({
+        message: "Resource not found.",
+      });
     }
 
     const bucket = req.app.locals.gridFSBucket;
@@ -189,41 +334,42 @@ async function sendPDF(req, res, disposition) {
       });
     }
 
-    // const file = await bucket.find({ _id: resource.fileId }).next();
+    const file = await bucket
+      .find({ _id: resource.fileId })
+      .next();
 
-    // if (!file) {
-    //   return res.status(404).json({ message: "PDF file not found." });
-    // }
+    if (!file) {
+      return res.status(404).json({
+        message: "PDF file not found.",
+      });
+    }
 
-    console.log("Resource ID:", resource._id);
-console.log("Resource fileId:", resource.fileId);
+    res.setHeader(
+      "Content-Type",
+      "application/pdf"
+    );
 
-const file = await bucket.find({
-  _id: new mongoose.Types.ObjectId(resource.fileId)
-}).next();
+    res.setHeader(
+      "X-Content-Type-Options",
+      "nosniff"
+    );
 
-console.log("GridFS file:", file);
+    res.setHeader(
+      "Content-Disposition",
+      `${disposition}; filename="resource.pdf"`
+    );
 
-if (!file) {
-  return res.status(404).json({
-    message: "PDF file not found."
-  });
-}
-
-
-
-
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Disposition", `${disposition}; filename="resource.pdf"`);
-
-    const stream = bucket.openDownloadStream(resource.fileId);
+    const stream = bucket.openDownloadStream(
+      resource.fileId
+    );
 
     stream.on("error", (error) => {
       console.error("PDF stream error:", error);
+
       if (!res.headersSent) {
-        res.status(500).end("Unable to stream PDF.");
+        res.status(500).end(
+          "Unable to stream PDF."
+        );
       } else {
         res.destroy(error);
       }
@@ -232,14 +378,21 @@ if (!file) {
     stream.pipe(res);
   } catch (error) {
     console.error("Read PDF error:", error);
+
     if (!res.headersSent) {
-      res.status(500).json({ message: "Unable to read PDF." });
+      return res.status(500).json({
+        message: "Unable to read PDF.",
+      });
     }
   }
 }
 
-router.get("/:id/view", (req, res) => sendPDF(req, res, "inline"));
+// View PDF in browser
+router.get("/:id/view", (req, res) =>
+  sendPDF(req, res, "inline")
+);
 
+// Download PDF
 router.get("/:id/download", (req, res) =>
   sendPDF(req, res, "attachment")
 );

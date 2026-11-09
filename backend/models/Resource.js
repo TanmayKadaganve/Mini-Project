@@ -4,9 +4,18 @@ import mongoose from "mongoose";
 
 const resourceSchema = new mongoose.Schema(
   {
+
+    subjectCode: {
+  type: String,
+  required: true,
+  trim: true,
+  uppercase: true,
+  index: true,
+},
+
     scheme: {
       type: String,
-      enum: ["2018", "2025"],
+      enum: [ "2022", "2025"],
       required: true,
       index: true,
     },

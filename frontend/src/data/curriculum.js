@@ -9,7 +9,7 @@ const makeSubject = (name, code = "") => ({
   })),
 });
 
-const firstYear2018 = {
+const firstYear2022 = {
   1: [
     makeSubject("Mathematics-1 for CSE Stream", "BMATS101"),
     makeSubject("Applied Physics for CSE"),
@@ -20,7 +20,7 @@ const firstYear2018 = {
   ],
 };
 
-const commonCSESubjects2018 = {
+const commonCSESubjects2022 = {
   3: [
     makeSubject("Mathematics for CSE"),
     makeSubject("Operating System"),
@@ -43,12 +43,24 @@ const commonCSESubjects2018 = {
 };
 
 const curriculum = {
-  "2018": {
-    "First Year": firstYear2018,
+  "2022": {
+    "First Year": firstYear2022,
 
-    CSE: commonCSESubjects2018,
+    CSE: {
+      3: [makeSubject("SEPM","BCS501")],
+      4: [makeSubject("Principles of Communication Systems")],
+      5: [makeSubject("Digital Signal Processing")],
+      6: [makeSubject("VLSI Design and Testing")],
+      7: [makeSubject("Computer Networks and Protocols")],
+    },
 
-    AIML: commonCSESubjects2018,
+    AIML:{
+      3: [makeSubject("Digital System Design using Verilog")],
+      4: [makeSubject("Principles of Communication Systems")],
+      5: [makeSubject("Digital Signal Processing")],
+      6: [makeSubject("VLSI Design and Testing")],
+      7: [makeSubject("Computer Networks and Protocols")],
+    },
 
     ECE: {
       3: [makeSubject("Digital System Design using Verilog")],
@@ -113,5 +125,26 @@ export const branches = [
   "Civil",
   "Mechanical",
 ];
+
+
+export const getSubjects = (scheme, branch, semester) => {
+  const branchMap = {
+    "FIRST YEAR": "First Year",
+    CSE: "CSE",
+    AIML: "AIML",
+    ECE: "ECE",
+    CIVIL: "Civil",
+    MECHANICAL: "Mechanical",
+  };
+
+  const normalizedBranch = branchMap[branch?.trim().toUpperCase()];
+
+  if (!normalizedBranch || !curriculum[scheme]) {
+    return [];
+  }
+
+  return curriculum[scheme][normalizedBranch]?.[Number(semester)] || [];
+};
+
 
 export default curriculum;

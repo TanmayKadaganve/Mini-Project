@@ -1,3 +1,5 @@
+import dns from "node:dns";
+
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -5,6 +7,13 @@ import dotenv from "dotenv";
 
 import resourceRoutes from "./routes/Resources.js";
 
+import facultyAuthRoutes from "./routes/FacultyAuth.js";
+
+
+
+
+
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 
 dotenv.config();
@@ -30,6 +39,7 @@ async function startServer() {
     );
 
     app.use("/api/resources", resourceRoutes);
+    app.use("/api/faculty", facultyAuthRoutes);
 
     app.get("/api/health", (req, res) => {
       res.json({ status: "ok" });
