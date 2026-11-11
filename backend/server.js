@@ -9,7 +9,7 @@ import resourceRoutes from "./routes/Resources.js";
 
 import facultyAuthRoutes from "./routes/FacultyAuth.js";
 
-
+import labResourcesRouter from "./routes/LabResources.js";
 
 
 
@@ -39,6 +39,9 @@ async function startServer() {
     );
 
     app.use("/api/resources", resourceRoutes);
+
+    app.use("/api/lab-resources", labResourcesRouter);
+
     app.use("/api/faculty", facultyAuthRoutes);
 
     app.get("/api/health", (req, res) => {

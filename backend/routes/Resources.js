@@ -18,6 +18,13 @@ const allowedBranches = [
   "CIVIL",
 ];
 
+const allowedResourceTypes = [
+  "Notes",
+  "Model QP",
+  "PYQ",
+  "Other",
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -31,39 +38,134 @@ function validObjectId(id) {
 
 // ==================================================
 // GET: List resources
-// Public access for students and faculty
+// Public access
+// Search using subjectCode and category-specific fields
 // ==================================================
 
+
 router.get("/", async (req, res) => {
-  
   try {
     const {
       scheme,
       branch,
       semester,
-      subject,
+      subjectCode,
+      resourceType,
       module,
+      questionPaperYear,
     } = req.query;
-const normalizedBranch = branch.trim().toUpperCase();
-    if (
-      !scheme ||
-      !branch ||
-      !semester ||
-      !subject ||
-      !module
-    ) {
+
+    if (!allowedResourceTypes.includes(resourceType)) {
       return res.status(400).json({
-        message: "All academic filters are required.",
+        message: "Invalid resource type.",
       });
     }
 
-    const resources = await Resource.find({
-      scheme,
-      branch: normalizedBranch,
-      semester: Number(semester),
-      subject,
-      module: Number(module),
-    })
+    const filter = { resourceType };
+
+    // NOTES: Existing subject-code + module retrieval
+    if (resourceType === "Notes") {
+      if (!subjectCode) {
+        return res.status(400).json({
+          message: "Subject code is required.",
+        });
+      }
+
+      const normalizedCode = subjectCode.trim().toUpperCase();
+      const moduleNumber = Number(module);
+
+      if (!normalizedCode) {
+        return res.status(400).json({
+          message: "Invalid subject code.",
+        });
+      }
+
+      if (
+        !Number.isInteger(moduleNumber) ||
+        moduleNumber < 1 ||
+        moduleNumber > 5
+      ) {
+        return res.status(400).json({
+          message: "A valid module number is required.",
+        });
+      }
+
+      filter.subjectCode = normalizedCode;
+      filter.module = moduleNumber;
+    }
+
+    // MODEL QP and PYQ: Scheme + Branch + Semester
+    else if (
+      resourceType === "Model QP" ||
+      resourceType === "PYQ"
+    ) {
+      if (!scheme || !branch || !semester) {
+        return res.status(400).json({
+          message: "Scheme, branch and semester are required.",
+        });
+      }
+
+      if (!["2022", "2025"].includes(scheme)) {
+        return res.status(400).json({
+          message: "Invalid scheme.",
+        });
+      }
+
+      const normalizedBranch = branch.trim().toUpperCase();
+
+      if (!allowedBranches.includes(normalizedBranch)) {
+        return res.status(400).json({
+          message: "Invalid branch.",
+        });
+      }
+
+      const semesterNumber = Number(semester);
+
+      if (
+        !Number.isInteger(semesterNumber) ||
+        semesterNumber < 1 ||
+        semesterNumber > 8
+      ) {
+        return res.status(400).json({
+          message: "Invalid semester.",
+        });
+      }
+
+      filter.scheme = scheme;
+      filter.branch = normalizedBranch;
+      filter.semester = semesterNumber;
+
+      // Optional subject-code filter
+      if (subjectCode) {
+        filter.subjectCode = subjectCode.trim().toUpperCase();
+      }
+
+      // Optional year filter for PYQ
+      if (resourceType === "PYQ" && questionPaperYear) {
+        const year = Number(questionPaperYear);
+
+        if (!Number.isInteger(year) || year < 2000) {
+          return res.status(400).json({
+            message: "Invalid question paper year.",
+          });
+        }
+
+        filter.questionPaperYear = year;
+      }
+    }
+
+    // OTHER: Existing subject-code-based retrieval
+    else if (resourceType === "Other") {
+      if (!subjectCode) {
+        return res.status(400).json({
+          message: "Subject code is required.",
+        });
+      }
+
+      filter.subjectCode = subjectCode.trim().toUpperCase();
+    }
+
+    const resources = await Resource.find(filter)
       .select("-fileId")
       .sort({ uploadedAt: -1 })
       .lean();
@@ -78,10 +180,11 @@ const normalizedBranch = branch.trim().toUpperCase();
   }
 });
 
+
 // ==================================================
 // POST: Upload PDF
 // Faculty authentication required
-// Branch comes from the verified JWT
+// Branch comes from verified JWT
 // ==================================================
 
 router.post(
@@ -96,11 +199,13 @@ router.post(
         scheme,
         semester,
         subject,
+        subjectCode,
         module,
         resourceType,
+        questionPaperYear,
       } = req.body;
 
-      // Never trust the branch sent by the frontend.
+      // Never trust branch sent by frontend.
       const branch = req.faculty.branch
         .trim()
         .toUpperCase();
@@ -116,10 +221,11 @@ router.post(
         !scheme ||
         !semester ||
         !subject ||
-        !module
+        !subjectCode ||
+        !resourceType
       ) {
         return res.status(400).json({
-          message: "PDF and all academic fields are required.",
+          message: "PDF and all required academic fields are required.",
         });
       }
 
@@ -129,29 +235,69 @@ router.post(
         });
       }
 
+      if (!allowedResourceTypes.includes(resourceType)) {
+        return res.status(400).json({
+          message: "Invalid resource type.",
+        });
+      }
+
       if (req.file.mimetype !== "application/pdf") {
         return res.status(400).json({
           message: "Only PDF files are allowed.",
         });
       }
 
+      const semesterNumber = Number(semester);
+
       if (
-        !Number.isInteger(Number(semester)) ||
-        Number(semester) < 1 ||
-        Number(semester) > 8 ||
-        !Number.isInteger(Number(module)) ||
-        Number(module) < 1 ||
-        Number(module) > 5
+        !Number.isInteger(semesterNumber) ||
+        semesterNumber < 1 ||
+        semesterNumber > 8
       ) {
         return res.status(400).json({
-          message: "Invalid semester or module.",
+          message: "Invalid semester.",
         });
       }
 
-      if (!subject.trim()) {
+      const normalizedSubject = subject.trim();
+      const normalizedCode = subjectCode.trim().toUpperCase();
+
+      if (!normalizedSubject || !normalizedCode) {
         return res.status(400).json({
-          message: "Subject is required.",
+          message: "Subject name and subject code are required.",
         });
+      }
+
+      let moduleNumber;
+      let paperYear;
+
+      // Notes require a module.
+      if (resourceType === "Notes") {
+        moduleNumber = Number(module);
+
+        if (
+          !Number.isInteger(moduleNumber) ||
+          moduleNumber < 1 ||
+          moduleNumber > 5
+        ) {
+          return res.status(400).json({
+            message: "Select a valid module for Notes.",
+          });
+        }
+      }
+
+      // PYQ requires a question paper year.
+      if (resourceType === "PYQ") {
+        paperYear = Number(questionPaperYear);
+
+        if (
+          !Number.isInteger(paperYear) ||
+          paperYear < 2000
+        ) {
+          return res.status(400).json({
+            message: "Enter a valid question paper year.",
+          });
+        }
       }
 
       const bucket = req.app.locals.gridFSBucket;
@@ -170,34 +316,47 @@ router.post(
 
       uploadedFileId = fileId;
 
+      const fileMetadata = {
+        scheme,
+        branch,
+        semester: semesterNumber,
+        subject: normalizedSubject,
+        subjectCode: normalizedCode,
+        resourceType,
+      };
+
+      if (resourceType === "Notes") {
+        fileMetadata.module = moduleNumber;
+      }
+
+      if (resourceType === "PYQ") {
+        fileMetadata.questionPaperYear = paperYear;
+      }
+
+      // Store PDF in MongoDB GridFS.
       const stream = bucket.openUploadStream(safeName, {
         id: fileId,
         contentType: "application/pdf",
-        metadata: {
-          scheme,
-          branch,
-          semester: Number(semester),
-          subject: subject.trim(),
-          module: Number(module),
-        },
+        metadata: fileMetadata,
       });
 
       await new Promise((resolve, reject) => {
         stream.on("error", reject);
         stream.on("finish", resolve);
 
-        Readable.from(req.file.buffer).pipe(stream);
+        Readable.from([req.file.buffer]).pipe(stream);
       });
 
+      // Store resource details in MongoDB.
       const resource = await Resource.create({
-        scheme,
-        branch,
-        semester: Number(semester),
-        subject: subject.trim(),
-        module: Number(module),
+        ...fileMetadata,
+        ...(moduleNumber !== undefined && {
+          module: moduleNumber,
+        }),
+        ...(paperYear !== undefined && {
+          questionPaperYear: paperYear,
+        }),
         originalName: safeName,
-        resourceType:
-          resourceType?.trim() || "Study Material",
         fileId,
         fileSize: req.file.size,
       });
@@ -206,12 +365,15 @@ router.post(
         message: "PDF uploaded successfully.",
         resource: {
           _id: resource._id,
+          subjectCode: resource.subjectCode,
           originalName: resource.originalName,
           resourceType: resource.resourceType,
+          module: resource.module,
+          questionPaperYear: resource.questionPaperYear,
         },
       });
     } catch (error) {
-      // Clean up the GridFS file if metadata creation fails.
+      // Remove GridFS file if metadata creation fails.
       if (
         uploadedFileId &&
         req.app.locals.gridFSBucket
@@ -236,7 +398,6 @@ router.post(
 
 // ==================================================
 // DELETE: Delete resource
-// Faculty authentication required
 // Faculty can delete only their own branch resources
 // ==================================================
 
@@ -265,7 +426,6 @@ router.delete(
         .trim()
         .toUpperCase();
 
-      // Prevent cross-branch deletion.
       if (
         resource.branch.trim().toUpperCase() !==
         facultyBranch
@@ -284,10 +444,7 @@ router.delete(
         });
       }
 
-      // Delete the PDF from GridFS.
       await bucket.delete(resource.fileId);
-
-      // Delete the resource metadata from MongoDB.
       await Resource.findByIdAndDelete(id);
 
       return res.json({
@@ -344,15 +501,8 @@ async function sendPDF(req, res, disposition) {
       });
     }
 
-    res.setHeader(
-      "Content-Type",
-      "application/pdf"
-    );
-
-    res.setHeader(
-      "X-Content-Type-Options",
-      "nosniff"
-    );
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("X-Content-Type-Options", "nosniff");
 
     res.setHeader(
       "Content-Disposition",
@@ -367,9 +517,7 @@ async function sendPDF(req, res, disposition) {
       console.error("PDF stream error:", error);
 
       if (!res.headersSent) {
-        res.status(500).end(
-          "Unable to stream PDF."
-        );
+        res.status(500).end("Unable to stream PDF.");
       } else {
         res.destroy(error);
       }
@@ -387,7 +535,7 @@ async function sendPDF(req, res, disposition) {
   }
 }
 
-// View PDF in browser
+// View PDF
 router.get("/:id/view", (req, res) =>
   sendPDF(req, res, "inline")
 );

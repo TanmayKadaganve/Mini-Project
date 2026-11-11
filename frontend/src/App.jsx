@@ -1,12 +1,17 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import HomePage from "./pages/HomePage";
 import FacultyLogin from "./pages/FacultyLogin";
 import UploadPage from "./pages/UploadPage";
+import ModelPapersPage from "./pages/ModelPapersPage";
+import PYQPage from "./pages/PYQPage";
+
 import Footer from "./components/Footer";
 
-// Protect Upload Page
+import SyllabusPage from "./pages/SyllabusPage";
+
+import LabsPage from "./pages/LabsPage";
+
 function FacultyProtectedRoute({ children }) {
   const token = localStorage.getItem("facultyToken");
   const role = localStorage.getItem("facultyRole");
@@ -33,6 +38,26 @@ function App() {
         />
 
         <Route
+          path="/model-papers"
+          element={
+            <>
+              <ModelPapersPage />
+              <Footer />
+            </>
+          }
+        />
+
+        <Route
+          path="/pyqs"
+          element={
+            <>
+              <PYQPage />
+              <Footer />
+            </>
+          }
+        />
+
+        <Route
           path="/faculty-login"
           element={
             <>
@@ -50,6 +75,20 @@ function App() {
             </FacultyProtectedRoute>
           }
         />
+
+        <Route
+          path="/syllabus"
+          element={
+            <>
+              <SyllabusPage />
+              <Footer />
+            </>
+          }
+        />
+
+        <Route path="/labs" element={<LabsPage />} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

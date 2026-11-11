@@ -77,13 +77,13 @@ router.post("/login", async (req, res) => {
       branch: faculty.branch,
       role: "faculty",
     });
-  } catch (error) {
-    console.error("Faculty login error:", error.message);
+} catch (error) {
+  console.error("JWT verification failed:", error.name, error.message);
 
-    return res.status(500).json({
-      message: "Internal server error",
-    });
-  }
+  return res.status(401).json({
+    message: "Invalid or expired token",
+  });
+}
 });
 
 export default router;

@@ -15,7 +15,7 @@ const firstYear2022 = {
     makeSubject("Applied Physics for CSE"),
   ],
   2: [
-    makeSubject("Mathematics-2 for CSE Stream", "BMATS101"),
+    makeSubject("Mathematics-2 for CSE Stream", "BMATS201"),
     makeSubject("Applied Chemistry for CSE"),
   ],
 };
@@ -47,17 +47,17 @@ const curriculum = {
     "First Year": firstYear2022,
 
     CSE: {
-      3: [makeSubject("SEPM","BCS501")],
-      4: [makeSubject("Principles of Communication Systems")],
-      5: [makeSubject("Digital Signal Processing")],
+      3: [makeSubject("Mathematics for Computer Science","BCS301"),makeSubject("Digital Design & Computer Organization","BCS302"),makeSubject("Operating Systems","BCS303"),makeSubject("Data Structures and Applications","BCS304"),makeSubject("Object Oriented Programming with JAVA","BCS306-A"),makeSubject("Yoga","BYOK359"),makeSubject("Data Structures Lab","BCSL305"),makeSubject("Social Connect and Responsibility","BSCK307")],
+      4: [makeSubject("Analysis & Design of Algorithms","BCS401"),makeSubject("Microcontrollers","BCS402"),makeSubject("Database Management Systems","BCS403"),makeSubject("Discrete Mathematical Structures","BCS405A"),makeSubject("Technical writing using latex","BCSL456D"),makeSubject("Biology for Computer Engineers","BBOC407"),makeSubject("Analysis & Design of Algorithms Lab","BCSL404"),makeSubject("Universal Human Values Course","BUHK408"),makeSubject("Universal Human Values Course","BUHK408"),makeSubject("NSS","BYOK459")],
+      5: [makeSubject("Computer Networks","BCS502"),makeSubject("Software Engineering & Project Management","BCS501"),makeSubject("Theory of Computation","BCS503"),makeSubject("Unix System Programming","BCS515C"),makeSubject("Research Methodology and IPR","BRMK557"),makeSubject("Environmental Studies and E-waste Management","BCS508"),makeSubject("Web Technology Lab","BCSL504"),makeSubject("Yoga","BYOK559")],  
       6: [makeSubject("VLSI Design and Testing")],
       7: [makeSubject("Computer Networks and Protocols")],
     },
 
     AIML:{
-      3: [makeSubject("Digital System Design using Verilog")],
-      4: [makeSubject("Principles of Communication Systems")],
-      5: [makeSubject("Digital Signal Processing")],
+      3: [makeSubject("Mathematics for Computer Science","BCS301"),makeSubject("Digital Design & Computer Organization","BCS302"),makeSubject("Operating Systems","BCS303"),makeSubject("Data Structures and Applications","BCS304"),makeSubject("Object Oriented Programming with JAVA","BCS306-A"),makeSubject("Yoga","BYOK359")],
+      4: [makeSubject("Analysis & Design of Algorithms","BCS401"),makeSubject("Microcontrollers","BCS402"),makeSubject("Database Management Systems","BCS403"),makeSubject("Discrete Mathematical Structures","BCS405A"),makeSubject("Technical writing using latex","BCSL456D"),makeSubject("Biology for Computer Engineers","BBOC407"),makeSubject("Analysis & Design of Algorithms Lab","BCSL404"),makeSubject("Universal Human Values Course","BUHK408"),makeSubject("Universal Human Values Course","BUHK408"),makeSubject("NSS","BYOK459")],
+      5: [makeSubject("Computer Networks","BCS502"),makeSubject("Software Engineering & Project Management","BCS501"),makeSubject("Theory of Computation","BCS503"),makeSubject("Unix System Programming","BCS515C"),makeSubject("Research Methodology and IPR","BRMK557"),makeSubject("Environmental Studies and E-waste Management","BCS508"),makeSubject("Data Visualization Lab","BAIL504"),makeSubject("Yoga","BYOK559")],  
       6: [makeSubject("VLSI Design and Testing")],
       7: [makeSubject("Computer Networks and Protocols")],
     },
@@ -87,6 +87,9 @@ const curriculum = {
     },
   },
 
+
+
+  
   "2025": {
     "First Year": {
       1: [

@@ -1,21 +1,18 @@
-// Resource data model
 
 import mongoose from "mongoose";
 
 const resourceSchema = new mongoose.Schema(
   {
-
     subjectCode: {
-  type: String,
-  required: true,
-  trim: true,
-  uppercase: true,
-  index: true,
-},
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
+    },
 
     scheme: {
       type: String,
-      enum: [ "2022", "2025"],
+      enum: ["2022", "2025"],
       required: true,
       index: true,
     },
@@ -24,6 +21,7 @@ const resourceSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      uppercase: true,
       index: true,
     },
 
@@ -40,11 +38,17 @@ const resourceSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Required only for Notes (validated in the route)
     module: {
       type: Number,
-      required: true,
       min: 1,
       max: 5,
+    },
+
+    // Required only for PYQ (validated in the route)
+    questionPaperYear: {
+      type: Number,
+      min: 2000,
     },
 
     originalName: {
@@ -53,10 +57,11 @@ const resourceSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Available resource categories
     resourceType: {
       type: String,
-      default: "Study Material",
-      trim: true,
+      enum: ["Notes", "Syllabus", "Model QP", "PYQ", "Other"],
+      required: true,
     },
 
     fileId: {
@@ -78,12 +83,13 @@ const resourceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Optimized for category-based resource retrieval
+resourceSchema.index({ subjectCode: 1, module: 1 });
+
 resourceSchema.index({
-  scheme: 1,
-  branch: 1,
-  semester: 1,
-  subject: 1,
-  module: 1,
+  subjectCode: 1,
+  resourceType: 1,
+  questionPaperYear: 1,
 });
 
 export default mongoose.model("Resource", resourceSchema);

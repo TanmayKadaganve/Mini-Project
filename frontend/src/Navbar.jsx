@@ -8,63 +8,37 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   const [moreOpen, setMoreOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-
-
-const [isFacultyLoggedIn, setIsFacultyLoggedIn] = useState(
-  Boolean(
-    localStorage.getItem("facultyToken") &&
-    localStorage.getItem("facultyRole") === "faculty"
-  )
-);
-
-const [facultyBranch, setFacultyBranch] = useState(
-  localStorage.getItem("facultyBranch") || ""
-);
-
-// Update faculty login status
-useEffect(() => {
-  const updateFacultyStatus = () => {
-    const token = localStorage.getItem("facultyToken");
-    const branch = localStorage.getItem("facultyBranch");
-    const role = localStorage.getItem("facultyRole");
-
-    setIsFacultyLoggedIn(
-      Boolean(token) && role === "faculty"
-    );
-
-    setFacultyBranch(branch || "");
-  };
-
-  window.addEventListener(
-    "faculty-auth-changed",
-    updateFacultyStatus
+  const [isFacultyLoggedIn, setIsFacultyLoggedIn] = useState(
+    Boolean(
+      localStorage.getItem("facultyToken") &&
+      localStorage.getItem("facultyRole") === "faculty"
+    )
   );
 
-  return () => {
-    window.removeEventListener(
-      "faculty-auth-changed",
-      updateFacultyStatus
-    );
-  };
-}, []);
+  const [facultyBranch, setFacultyBranch] = useState(
+    localStorage.getItem("facultyBranch") || ""
+  );
 
-  // Faculty logout
-  const handleLogout = () => {
-    localStorage.removeItem("facultyToken");
-    localStorage.removeItem("facultyBranch");
-    localStorage.removeItem("facultyRole");
+  useEffect(() => {
+    const updateFacultyStatus = () => {
+      const token = localStorage.getItem("facultyToken");
+      const branch = localStorage.getItem("facultyBranch");
+      const role = localStorage.getItem("facultyRole");
 
-    setIsFacultyLoggedIn(false);
-    setFacultyBranch("");
+      setIsFacultyLoggedIn(Boolean(token) && role === "faculty");
+      setFacultyBranch(branch || "");
+    };
 
-    closeMenus();
+    window.addEventListener("faculty-auth-changed", updateFacultyStatus);
 
-    navigate("/");
-  };
+    return () => {
+      window.removeEventListener("faculty-auth-changed", updateFacultyStatus);
+    };
+  }, []);
 
-  // Navigation links
   const navLinks = [
     { label: "Home", href: "/" },
     { label: "Syllabus", href: "/syllabus" },
@@ -74,26 +48,43 @@ useEffect(() => {
     { label: "Calculator", href: "/calculator" },
   ];
 
+  const guideLinks = [
+    { label: "Revaluation Guide", href: "/guide/revaluation" },
+    { label: "SGPA/CGPA Guide", href: "/guide/sgpa-cgpa" },
+    { label: "Internship Guide", href: "/guide/internship" },
+  ];
+
   const moreLinks = [
     { label: "VTU Scheme", href: "/vtu-scheme" },
-    { label: "Academic Calendar", href: "/academic-calendar" },
+    { label: "Calendar", href: "/academic-calendar" },
+    { label: "Activity", href: "/activity" },
+    { label: "Notice Board", href: "/notice-board" },
   ];
 
   function closeMenus() {
     setMoreOpen(false);
+    setGuideOpen(false);
     setMenuOpen(false);
   }
+
+  const handleLogout = () => {
+    localStorage.removeItem("facultyToken");
+    localStorage.removeItem("facultyBranch");
+    localStorage.removeItem("facultyRole");
+
+    setIsFacultyLoggedIn(false);
+    setFacultyBranch("");
+
+    closeMenus();
+    navigate("/");
+  };
 
   return (
     <header className="rh-header">
       <nav className="rh-navbar" aria-label="Main navigation">
 
         {/* Logo */}
-        <Link
-          className="rh-brand"
-          to="/"
-          onClick={closeMenus}
-        >
+        <Link className="rh-brand" to="/" onClick={closeMenus}>
           <span className="rh-brand-icon" aria-hidden="true">
             RH
           </span>
@@ -116,9 +107,8 @@ useEffect(() => {
         </button>
 
         {/* Navigation links */}
-        <div
-          className={`rh-nav-links ${menuOpen ? "is-open" : ""}`}
-        >
+        <div className={`rh-nav-links ${menuOpen ? "is-open" : ""}`}>
+
           {navLinks.map((link) => (
             <Link
               key={link.label}
@@ -130,6 +120,37 @@ useEffect(() => {
             </Link>
           ))}
 
+          {/* Guide dropdown */}
+          <div className="rh-more">
+            <button
+              type="button"
+              className="rh-nav-link rh-more-button"
+              aria-expanded={guideOpen}
+              aria-haspopup="true"
+              onClick={() => {
+                setGuideOpen(!guideOpen);
+                setMoreOpen(false);
+              }}
+            >
+              Guide <span aria-hidden="true">{guideOpen ? "▴" : "▾"}</span>
+            </button>
+
+            {guideOpen && (
+              <div className="rh-dropdown">
+                {guideLinks.map((link) => (
+                  <Link
+                    key={link.label}
+                    to={link.href}
+                    className="rh-dropdown-link"
+                    onClick={closeMenus}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* More dropdown */}
           <div className="rh-more">
             <button
@@ -137,12 +158,12 @@ useEffect(() => {
               className="rh-nav-link rh-more-button"
               aria-expanded={moreOpen}
               aria-haspopup="true"
-              onClick={() => setMoreOpen(!moreOpen)}
+              onClick={() => {
+                setMoreOpen(!moreOpen);
+                setGuideOpen(false);
+              }}
             >
-              More{" "}
-              <span aria-hidden="true">
-                {moreOpen ? "▴" : "▾"}
-              </span>
+              More <span aria-hidden="true">{moreOpen ? "▴" : "▾"}</span>
             </button>
 
             {moreOpen && (
@@ -193,6 +214,7 @@ useEffect(() => {
               Faculty Login
             </Link>
           )}
+
         </div>
       </nav>
     </header>

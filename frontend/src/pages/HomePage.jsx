@@ -81,37 +81,42 @@ function HomePage() {
     setSelectedPDF(null);
   }
 
-  async function openModule(nextModule) {
-    setModule(nextModule);
-    setSelectedPDF(null);
-    setSearch("");
-    setError("");
-    setLoading(true);
-    setResources([]);
+  
+async function openModule(nextModule) {
+  setModule(nextModule);
+  setSelectedPDF(null);
+  setSearch("");
+  setError("");
+  setLoading(true);
+  setResources([]);
 
-    try {
-      const params = new URLSearchParams({
-        scheme,
-        branch,
-        semester: String(semester),
-        subject: subject.name,
-        module: String(nextModule.number),
-      });
+  try {
+    const params = new URLSearchParams({
+      subjectCode: subject.code,
+      resourceType: "Notes",
+      module: String(nextModule.number),
+    });
 
-      const response = await fetch(`${API}/resources?${params}`);
+    const response = await fetch(`${API}/resources?${params}`);
 
-      if (!response.ok) {
-        throw new Error("Could not load resources.");
-      }
+    const data = await response.json();
 
-      const data = await response.json();
-      setResources(data.resources || []);
-    } catch {
-      setError("Unable to load resources. Check that the backend is running.");
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error(data.message || "Could not load resources.");
     }
+
+    setResources(data.resources || []);
+  } catch (error) {
+    console.error("Resource fetching error:", error);
+
+    setError(
+      error.message || "Unable to load resources."
+    );
+  } finally {
+    setLoading(false);
   }
+}
+
 
   // Refresh the current module's resources when the user returns
   // from the PDF reader.
